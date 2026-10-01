@@ -16,6 +16,7 @@ import {
   ChevronRight,
   User,
   Shield,
+  BarChart,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -40,6 +41,11 @@ const navItems = [
     href: '/customers',
     label: 'Customers',
     icon: Users,
+  },
+  {
+    href: '/purchase-summary',
+    label: 'Purchase Summary',
+    icon: BarChart,
   },
 ];
 
