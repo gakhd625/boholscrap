@@ -12,8 +12,10 @@ import type {
   Customer,
   Transaction,
   CustomerMatch,
+  TransactionItem,
+  KaratOption,
 } from '@/lib/types';
-import { PHILIPPINE_ID_TYPES } from '@/lib/types';
+import { PHILIPPINE_ID_TYPES, KARAT_OPTIONS } from '@/lib/types';
 import {
   maskIdNumber,
   formatDate,
@@ -31,6 +33,8 @@ import {
   Eye,
   Shield,
   Info,
+  PlusCircle,
+  Trash2,
 } from 'lucide-react';
 
 interface ReviewStepProps {
@@ -59,7 +63,9 @@ imagePreviewUrl,
 
   // Transaction fields
   const [transactionType, setTransactionType] = useState<string>('other');
-  const [amount, setAmount] = useState('');
+  const [items, setItems] = useState<TransactionItem[]>([
+    { id: crypto.randomUUID(), description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
+  ]);
   const [notes, setNotes] = useState('');
 
   // Customer matching
@@ -132,7 +138,40 @@ imagePreviewUrl,
   }, []);
 
   // Form validation
-  const isFormValid = fullName.trim() && idType && idNumber.trim();
+  const isFormValid = fullName.trim() && idType && idNumber.trim() && items.length > 0 && items.every(i => i.description.trim() !== '');
+
+  // Calculate overall total
+  const overallTotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
+
+  // Item handlers
+  const handleAddItem = useCallback(() => {
+    setItems(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
+    ]);
+  }, []);
+
+  const handleRemoveItem = useCallback((id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+  }, []);
+
+  const handleItemChange = useCallback((id: string, field: keyof TransactionItem, value: any) => {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, [field]: value };
+      
+      // Auto-calculate item total if weight or price changes
+      if (field === 'weight' || field === 'pricePerGram') {
+        const weight = field === 'weight' ? Number(value) : item.weight;
+        const price = field === 'pricePerGram' ? Number(value) : item.pricePerGram;
+        updated.itemTotal = weight * price;
+      }
+      
+      // If user manually edits total, we just accept it
+      
+      return updated;
+    }));
+  }, []);
 
   // Submit handler — EXPLICIT CONFIRMATION
   const handleConfirmAndSave = useCallback(async () => {
@@ -155,7 +194,8 @@ imagePreviewUrl,
 
       const transactionData: TransactionFormData = {
         transactionType: transactionType as any,
-        amount: amount || '0',
+        items: items,
+        amount: overallTotal.toString(),
         notes: notes.trim(),
       };
 
@@ -188,7 +228,8 @@ imagePreviewUrl,
     address,
     dateOfBirth,
     transactionType,
-    amount,
+    items,
+    overallTotal,
     notes,
     selectedCustomer,
     storagePath,
@@ -455,21 +496,110 @@ imagePreviewUrl,
             </select>
           </div>
 
-          {/* Amount */}
-          <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-surface-700 mb-1.5">
-              Amount (₱)
-            </label>
-            <input
-              id="amount"
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full h-12 px-4 rounded-xl bg-surface-200/50 border border-surface-300/50 text-surface-900 placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all"
-              placeholder="0.00"
-            />
+          {/* Items Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-surface-700">
+                Transaction Items
+              </label>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="flex items-center gap-1.5 text-sm text-gold-500 hover:text-gold-600 font-medium transition-colors"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Add Item
+              </button>
+            </div>
+            
+            {items.map((item, index) => (
+              <div key={item.id} className="bg-surface-200/40 p-4 rounded-xl border border-surface-300/40 space-y-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Item {index + 1}</span>
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="text-rose-400 hover:text-rose-500 transition-colors"
+                      title="Remove Item"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Description / Item Name</label>
+                    <input
+                      type="text"
+                      value={item.description}
+                      onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      placeholder="e.g. Gold Necklace, Diamond Ring"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Weight (g)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={item.weight || ''}
+                      onChange={(e) => handleItemChange(item.id, 'weight', parseFloat(e.target.value) || 0)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      placeholder="0.0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Karat</label>
+                    <select
+                      value={item.karat}
+                      onChange={(e) => handleItemChange(item.id, 'karat', e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                    >
+                      {KARAT_OPTIONS.map(k => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Price per gram (₱)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.pricePerGram || ''}
+                      onChange={(e) => handleItemChange(item.id, 'pricePerGram', parseFloat(e.target.value) || 0)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Item Total (₱)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.itemTotal || ''}
+                      onChange={(e) => handleItemChange(item.id, 'itemTotal', parseFloat(e.target.value) || 0)}
+                      className="w-full h-10 px-3 rounded-lg bg-gold-500/10 border border-gold-500/30 text-surface-900 font-semibold focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Overall Total Display */}
+          <div className="flex items-center justify-between p-4 bg-surface-200/50 rounded-xl border border-surface-300/50">
+            <span className="text-sm font-medium text-surface-700">Overall Transaction Total</span>
+            <span className="text-xl font-bold text-surface-950">{formatCurrency(overallTotal)}</span>
           </div>
 
           {/* Notes */}
@@ -531,10 +661,14 @@ imagePreviewUrl,
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-surface-600">Amount</span>
-            <span className="text-surface-900 font-medium">
-              {amount ? formatCurrency(parseFloat(amount)) : '₱0.00'}
+            <span className="text-surface-600">Total Amount</span>
+            <span className="text-surface-900 font-medium text-lg">
+              {formatCurrency(overallTotal)}
             </span>
+          </div>
+          <div className="flex justify-between text-xs mt-1 border-t border-surface-300/20 pt-2">
+            <span className="text-surface-500">Items</span>
+            <span className="text-surface-600 font-medium">{items.length} item(s)</span>
           </div>
           {selectedCustomer && (
             <div className="flex justify-between">

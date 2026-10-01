@@ -309,6 +309,7 @@ export async function createTransaction(
         customer_id: customerId,
         id_document_id: idDocumentId,
         transaction_type: formData.transactionType || 'other',
+        items: formData.items || [],
         amount,
         staff_id: user.id,
         notes: formData.notes?.trim() || null,

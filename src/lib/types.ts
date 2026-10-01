@@ -37,6 +37,21 @@ export interface IdDocument {
 
 export type TransactionType = 'buy' | 'sell' | 'pawn' | 'trade' | 'repair' | 'other';
 
+export const KARAT_OPTIONS = [
+  '6K', '8K', '9K', '10K', '12K', '14K', '16K', '18K', '20K', '21K', '22K', '23K', '24K', '70%'
+] as const;
+
+export type KaratOption = typeof KARAT_OPTIONS[number];
+
+export interface TransactionItem {
+  id: string; // client-side generated for keys
+  description: string;
+  weight: number;
+  karat: KaratOption | string;
+  pricePerGram: number;
+  itemTotal: number;
+}
+
 export interface Transaction {
   id: string;
   customer_id: string;
@@ -44,6 +59,7 @@ export interface Transaction {
   transaction_date: string;
   transaction_type: TransactionType;
   amount: number;
+  items: TransactionItem[] | null;
   staff_id: string | null;
   notes: string | null;
   created_at: string;
@@ -104,7 +120,8 @@ export interface ConfirmedCustomerData {
 
 export interface TransactionFormData {
   transactionType: TransactionType;
-  amount: string;
+  items: TransactionItem[];
+  amount: string; // overall total
   notes: string;
 }
 

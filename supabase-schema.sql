@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   transaction_type TEXT NOT NULL DEFAULT 'other'
     CHECK (transaction_type IN ('buy', 'sell', 'pawn', 'trade', 'repair', 'other')),
   amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  staff_id UUID REFERENCES auth.users(id),
+  items JSONB DEFAULT '[]'::jsonb,
+  staff_id UUID REFERENCES public.profiles(id),
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -134,14 +135,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS customers_updated_at ON public.customers;
 CREATE TRIGGER customers_updated_at
   BEFORE UPDATE ON public.customers
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+DROP TRIGGER IF EXISTS transactions_updated_at ON public.transactions;
 CREATE TRIGGER transactions_updated_at
   BEFORE UPDATE ON public.transactions
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+DROP TRIGGER IF EXISTS profiles_updated_at ON public.profiles;
 CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
@@ -153,14 +157,17 @@ CREATE TRIGGER profiles_updated_at
 -- Profiles RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
 CREATE POLICY "Admins can view all profiles"
   ON public.profiles FOR SELECT
   USING (
@@ -173,14 +180,17 @@ CREATE POLICY "Admins can view all profiles"
 -- Customers RLS
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated staff can view customers" ON public.customers;
 CREATE POLICY "Authenticated staff can view customers"
   ON public.customers FOR SELECT
   USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can insert customers" ON public.customers;
 CREATE POLICY "Authenticated staff can insert customers"
   ON public.customers FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can update customers" ON public.customers;
 CREATE POLICY "Authenticated staff can update customers"
   ON public.customers FOR UPDATE
   USING (auth.role() = 'authenticated');
@@ -188,10 +198,12 @@ CREATE POLICY "Authenticated staff can update customers"
 -- ID Documents RLS
 ALTER TABLE public.id_documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated staff can view id_documents" ON public.id_documents;
 CREATE POLICY "Authenticated staff can view id_documents"
   ON public.id_documents FOR SELECT
   USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can insert id_documents" ON public.id_documents;
 CREATE POLICY "Authenticated staff can insert id_documents"
   ON public.id_documents FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
@@ -199,14 +211,17 @@ CREATE POLICY "Authenticated staff can insert id_documents"
 -- Transactions RLS
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated staff can view transactions" ON public.transactions;
 CREATE POLICY "Authenticated staff can view transactions"
   ON public.transactions FOR SELECT
   USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can insert transactions" ON public.transactions;
 CREATE POLICY "Authenticated staff can insert transactions"
   ON public.transactions FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can update transactions" ON public.transactions;
 CREATE POLICY "Authenticated staff can update transactions"
   ON public.transactions FOR UPDATE
   USING (auth.role() = 'authenticated');
@@ -214,10 +229,12 @@ CREATE POLICY "Authenticated staff can update transactions"
 -- Audit Logs RLS
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated staff can view audit_logs" ON public.audit_logs;
 CREATE POLICY "Authenticated staff can view audit_logs"
   ON public.audit_logs FOR SELECT
   USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated staff can insert audit_logs" ON public.audit_logs;
 CREATE POLICY "Authenticated staff can insert audit_logs"
   ON public.audit_logs FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
@@ -237,6 +254,7 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage RLS policies
+DROP POLICY IF EXISTS "Authenticated users can upload id documents" ON storage.objects;
 CREATE POLICY "Authenticated users can upload id documents"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -244,6 +262,7 @@ CREATE POLICY "Authenticated users can upload id documents"
     AND auth.role() = 'authenticated'
   );
 
+DROP POLICY IF EXISTS "Authenticated users can view id documents" ON storage.objects;
 CREATE POLICY "Authenticated users can view id documents"
   ON storage.objects FOR SELECT
   USING (

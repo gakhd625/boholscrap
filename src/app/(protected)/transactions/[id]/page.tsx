@@ -115,6 +115,35 @@ export default async function TransactionDetailPage({
         )}
       </div>
 
+      {/* Items List */}
+      {tx.items && tx.items.length > 0 && (
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <h2 className="text-base font-semibold text-surface-900 flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-gold-500" />
+            Transaction Items ({tx.items.length})
+          </h2>
+
+          <div className="space-y-3">
+            {tx.items.map((item: any, i: number) => (
+              <div key={item.id || i} className="bg-surface-200/30 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <p className="font-medium text-surface-900">{item.description}</p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-surface-600">
+                    <span className="font-medium text-surface-800">{item.karat}</span>
+                    <span>{item.weight}g</span>
+                    <span>@ {formatCurrency(item.pricePerGram)}/g</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-surface-500 uppercase tracking-wider mb-0.5">Item Total</p>
+                  <p className="font-bold text-surface-950">{formatCurrency(item.itemTotal)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Customer Card */}
       {customer && (
         <Link
