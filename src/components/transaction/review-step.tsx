@@ -14,8 +14,9 @@ import type {
   CustomerMatch,
   TransactionItem,
   KaratOption,
+  ItemType,
 } from '@/lib/types';
-import { PHILIPPINE_ID_TYPES, KARAT_OPTIONS } from '@/lib/types';
+import { PHILIPPINE_ID_TYPES, KARAT_OPTIONS, COIN_DENOMINATIONS } from '@/lib/types';
 import {
   maskIdNumber,
   formatDate,
@@ -64,7 +65,7 @@ imagePreviewUrl,
   // Transaction fields
   const [transactionType, setTransactionType] = useState<string>('other');
   const [items, setItems] = useState<TransactionItem[]>([
-    { id: crypto.randomUUID(), description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
+    { id: crypto.randomUUID(), itemType: 'gold', description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
   ]);
   const [notes, setNotes] = useState('');
 
@@ -147,7 +148,7 @@ imagePreviewUrl,
   const handleAddItem = useCallback(() => {
     setItems(prev => [
       ...prev,
-      { id: crypto.randomUUID(), description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
+      { id: crypto.randomUUID(), itemType: 'gold', description: '', weight: 0, karat: '18K', pricePerGram: 0, itemTotal: 0 }
     ]);
   }, []);
 
@@ -160,14 +161,32 @@ imagePreviewUrl,
       if (item.id !== id) return item;
       const updated = { ...item, [field]: value };
       
-      // Auto-calculate item total if weight or price changes
-      if (field === 'weight' || field === 'pricePerGram') {
-        const weight = field === 'weight' ? Number(value) : item.weight;
-        const price = field === 'pricePerGram' ? Number(value) : item.pricePerGram;
-        updated.itemTotal = weight * price;
+      // Setup defaults when itemType changes
+      if (field === 'itemType') {
+        if (value === 'gold') {
+          updated.karat = '18K';
+        } else if (value === 'silver_coin') {
+          updated.denomination = '10c';
+        }
+      }
+
+      // Auto-calculate item total if weight, price, or quantity changes
+      const t = updated.itemType || 'gold';
+      if (t === 'silver_coin') {
+        if (field === 'quantity' || field === 'pricePerPiece') {
+          const qty = field === 'quantity' ? Number(value) : (item.quantity || 0);
+          const price = field === 'pricePerPiece' ? Number(value) : (item.pricePerPiece || 0);
+          updated.itemTotal = qty * price;
+        }
+      } else {
+        if (field === 'weight' || field === 'pricePerGram') {
+          const weight = field === 'weight' ? Number(value) : (item.weight || 0);
+          const price = field === 'pricePerGram' ? Number(value) : (item.pricePerGram || 0);
+          updated.itemTotal = weight * price;
+        }
       }
       
-      // If user manually edits total, we just accept it
+      // If user manually edits itemTotal, we just accept it
       
       return updated;
     }));
@@ -528,58 +547,120 @@ imagePreviewUrl,
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="md:col-span-2 lg:col-span-1">
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Item Type</label>
+                    <select
+                      value={item.itemType || 'gold'}
+                      onChange={(e) => handleItemChange(item.id, 'itemType', e.target.value as ItemType)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                    >
+                      <option value="gold">Gold</option>
+                      <option value="silver">Silver</option>
+                      <option value="silver_coin">Silver Coin</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2 lg:col-span-2">
                     <label className="block text-xs font-medium text-surface-600 mb-1">Description / Item Name</label>
                     <input
                       type="text"
                       value={item.description}
                       onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                       className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
-                      placeholder="e.g. Gold Necklace, Diamond Ring"
+                      placeholder={item.itemType === 'silver_coin' ? "e.g. Vintage coins" : "e.g. Necklace, Diamond Ring"}
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-surface-600 mb-1">Weight (g)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={item.weight || ''}
-                      onChange={(e) => handleItemChange(item.id, 'weight', parseFloat(e.target.value) || 0)}
-                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
-                      placeholder="0.0"
-                    />
-                  </div>
+                  {item.itemType === 'gold' && (
+                    <div>
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Karat</label>
+                      <select
+                        value={item.karat}
+                        onChange={(e) => handleItemChange(item.id, 'karat', e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      >
+                        {KARAT_OPTIONS.map(k => (
+                          <option key={k} value={k}>{k}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs font-medium text-surface-600 mb-1">Karat</label>
-                    <select
-                      value={item.karat}
-                      onChange={(e) => handleItemChange(item.id, 'karat', e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
-                    >
-                      {KARAT_OPTIONS.map(k => (
-                        <option key={k} value={k}>{k}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {item.itemType === 'silver_coin' && (
+                    <div>
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Denomination</label>
+                      <select
+                        value={item.denomination || '10c'}
+                        onChange={(e) => handleItemChange(item.id, 'denomination', e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                      >
+                        {COIN_DENOMINATIONS.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs font-medium text-surface-600 mb-1">Price per gram (₱)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.pricePerGram || ''}
-                      onChange={(e) => handleItemChange(item.id, 'pricePerGram', parseFloat(e.target.value) || 0)}
-                      className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
+                  {(item.itemType === 'gold' || item.itemType === 'silver') && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-surface-600 mb-1">Weight (g)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={item.weight || ''}
+                          onChange={(e) => handleItemChange(item.id, 'weight', parseFloat(e.target.value) || 0)}
+                          className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                          placeholder="0.0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-surface-600 mb-1">Price per gram (₱)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.pricePerGram || ''}
+                          onChange={(e) => handleItemChange(item.id, 'pricePerGram', parseFloat(e.target.value) || 0)}
+                          className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </>
+                  )}
 
-                  <div>
+                  {item.itemType === 'silver_coin' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-surface-600 mb-1">Quantity (pieces)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={item.quantity || ''}
+                          onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                          className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-surface-600 mb-1">Price per piece (₱)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.pricePerPiece || ''}
+                          onChange={(e) => handleItemChange(item.id, 'pricePerPiece', parseFloat(e.target.value) || 0)}
+                          className="w-full h-10 px-3 rounded-lg bg-surface-100 border border-surface-300/50 text-surface-900 focus:outline-none focus:ring-2 focus:ring-gold-500/50 transition-all text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className={item.itemType === 'gold' ? '' : 'md:col-span-2 lg:col-span-1'}>
                     <label className="block text-xs font-medium text-surface-600 mb-1">Item Total (₱)</label>
                     <input
                       type="number"

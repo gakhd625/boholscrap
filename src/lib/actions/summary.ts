@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { ActionResult, KARAT_OPTIONS, KaratOption, TransactionItem } from '@/lib/types';
+import { ActionResult, KARAT_OPTIONS, KaratOption, TransactionItem, COIN_DENOMINATIONS, CoinDenomination } from '@/lib/types';
 import { PostgrestError } from '@supabase/supabase-js';
 
 export interface KaratSummary {
@@ -10,12 +10,31 @@ export interface KaratSummary {
   totalAmount: number;
 }
 
+export interface CoinSummary {
+  denomination: CoinDenomination | string;
+  pieces: number;
+  totalAmount: number;
+}
+
 export interface PurchaseSummaryData {
+  overallBuyingAmount: number;
+  
   totalTransactions: number;
-  totalAmountPurchased: number;
-  totalWeightPurchased: number;
+
+  // Gold
+  totalGoldWeight: number;
+  totalGoldAmount: number;
   karatsPurchasedCount: number;
   karatBreakdown: KaratSummary[];
+
+  // Silver
+  totalSilverWeight: number;
+  totalSilverAmount: number;
+
+  // Silver Coins
+  totalSilverCoinsCount: number;
+  totalSilverCoinsAmount: number;
+  silverCoinBreakdown: CoinSummary[];
 }
 
 export async function getPurchaseSummary(
@@ -55,8 +74,14 @@ export async function getPurchaseSummary(
     }
 
     let totalTransactions = 0;
-    let totalAmountPurchased = 0;
-    let totalWeightPurchased = 0;
+    
+    let totalGoldWeight = 0;
+    let totalGoldAmount = 0;
+    let totalSilverWeight = 0;
+    let totalSilverAmount = 0;
+    let totalSilverCoinsCount = 0;
+    let totalSilverCoinsAmount = 0;
+    let overallBuyingAmount = 0;
 
     // Initialize karat map with all options set to 0
     const karatMap = new Map<string, { totalGrams: number; totalAmount: number }>();
@@ -64,29 +89,56 @@ export async function getPurchaseSummary(
       karatMap.set(k, { totalGrams: 0, totalAmount: 0 });
     });
 
+    const coinMap = new Map<string, { pieces: number; totalAmount: number }>();
+    COIN_DENOMINATIONS.forEach((c) => {
+      coinMap.set(c, { pieces: 0, totalAmount: 0 });
+    });
+
     transactions?.forEach((tx) => {
-      // Check if it's a purchase. Usually 'buy' or 'trade'. Let's include everything with items, or maybe just 'buy'?
-      // I will include all because the user said "All purchases are entered manually through the existing New Transaction form" and didn't specify a type filter, but 'buy' makes the most sense. Wait, I will just process all returned transactions.
       const items = (tx.items as unknown as TransactionItem[]) || [];
       if (items.length > 0) {
         totalTransactions++; // count transaction if it has items
       }
 
       items.forEach((item) => {
-        const weight = Number(item.weight) || 0;
         const itemTotal = Number(item.itemTotal) || 0;
-        const karat = item.karat;
-
-        totalWeightPurchased += weight;
-        totalAmountPurchased += itemTotal;
-
-        if (!karatMap.has(karat)) {
-          karatMap.set(karat, { totalGrams: 0, totalAmount: 0 });
-        }
+        overallBuyingAmount += itemTotal;
         
-        const current = karatMap.get(karat)!;
-        current.totalGrams += weight;
-        current.totalAmount += itemTotal;
+        const type = item.itemType || 'gold';
+
+        if (type === 'gold') {
+          const weight = Number(item.weight) || 0;
+          const karat = item.karat || '18K';
+          
+          totalGoldWeight += weight;
+          totalGoldAmount += itemTotal;
+
+          if (!karatMap.has(karat)) {
+            karatMap.set(karat, { totalGrams: 0, totalAmount: 0 });
+          }
+          const current = karatMap.get(karat)!;
+          current.totalGrams += weight;
+          current.totalAmount += itemTotal;
+          
+        } else if (type === 'silver') {
+          const weight = Number(item.weight) || 0;
+          totalSilverWeight += weight;
+          totalSilverAmount += itemTotal;
+          
+        } else if (type === 'silver_coin') {
+          const qty = Number(item.quantity) || 0;
+          const denom = item.denomination || '10c';
+          
+          totalSilverCoinsCount += qty;
+          totalSilverCoinsAmount += itemTotal;
+
+          if (!coinMap.has(denom)) {
+            coinMap.set(denom, { pieces: 0, totalAmount: 0 });
+          }
+          const current = coinMap.get(denom)!;
+          current.pieces += qty;
+          current.totalAmount += itemTotal;
+        }
       });
     });
 
@@ -96,17 +148,29 @@ export async function getPurchaseSummary(
       totalGrams: stats.totalGrams,
       totalAmount: stats.totalAmount,
     }));
+    
+    const silverCoinBreakdown: CoinSummary[] = Array.from(coinMap.entries()).map(([denomination, stats]) => ({
+      denomination,
+      pieces: stats.pieces,
+      totalAmount: stats.totalAmount,
+    }));
 
     const karatsPurchasedCount = Array.from(karatMap.values()).filter(s => s.totalGrams > 0).length;
 
     return {
       success: true,
       data: {
+        overallBuyingAmount,
         totalTransactions,
-        totalAmountPurchased,
-        totalWeightPurchased,
+        totalGoldWeight,
+        totalGoldAmount,
         karatsPurchasedCount,
         karatBreakdown,
+        totalSilverWeight,
+        totalSilverAmount,
+        totalSilverCoinsCount,
+        totalSilverCoinsAmount,
+        silverCoinBreakdown,
       },
     };
   } catch (error) {

@@ -129,9 +129,32 @@ export default async function TransactionDetailPage({
                 <div className="flex-1">
                   <p className="font-medium text-surface-900">{item.description}</p>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-surface-600">
-                    <span className="font-medium text-surface-800">{item.karat}</span>
-                    <span>{item.weight}g</span>
-                    <span>@ {formatCurrency(item.pricePerGram)}/g</span>
+                    <span className="px-2 py-0.5 rounded bg-surface-300/40 text-xs font-semibold uppercase">
+                      {(item.itemType || 'gold').replace('_', ' ')}
+                    </span>
+                    
+                    {(!item.itemType || item.itemType === 'gold') && (
+                      <>
+                        <span className="font-medium text-surface-800">{item.karat}</span>
+                        <span>{item.weight}g</span>
+                        <span>@ {formatCurrency(item.pricePerGram)}/g</span>
+                      </>
+                    )}
+                    
+                    {item.itemType === 'silver' && (
+                      <>
+                        <span>{item.weight}g</span>
+                        <span>@ {formatCurrency(item.pricePerGram)}/g</span>
+                      </>
+                    )}
+                    
+                    {item.itemType === 'silver_coin' && (
+                      <>
+                        <span className="font-medium text-surface-800">{item.denomination}</span>
+                        <span>{item.quantity} pieces</span>
+                        <span>@ {formatCurrency(item.pricePerPiece)}/pc</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">

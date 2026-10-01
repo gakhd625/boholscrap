@@ -43,12 +43,21 @@ export const KARAT_OPTIONS = [
 
 export type KaratOption = typeof KARAT_OPTIONS[number];
 
+export type ItemType = 'gold' | 'silver' | 'silver_coin';
+
+export const COIN_DENOMINATIONS = ['10c', '20c', '50c', '1 Peso'] as const;
+export type CoinDenomination = typeof COIN_DENOMINATIONS[number];
+
 export interface TransactionItem {
   id: string; // client-side generated for keys
+  itemType?: ItemType; // defaults to gold if missing for backward compatibility
   description: string;
-  weight: number;
-  karat: KaratOption | string;
-  pricePerGram: number;
+  weight?: number; // used for gold and silver
+  karat?: KaratOption | string; // used for gold
+  pricePerGram?: number; // used for gold and silver
+  denomination?: CoinDenomination | string; // used for silver_coin
+  quantity?: number; // used for silver_coin
+  pricePerPiece?: number; // used for silver_coin
   itemTotal: number;
 }
 
