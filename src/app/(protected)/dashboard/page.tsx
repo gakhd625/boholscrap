@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import {
   getRecentTransactions,
   getTransactionCount,
@@ -8,7 +9,6 @@ import {
   formatCurrency,
   formatDateTime,
   getTransactionTypeLabel,
-  maskIdNumber,
 } from '@/lib/utils';
 import {
   Plus,
@@ -18,16 +18,155 @@ import {
   ArrowRight,
   Clock,
   User,
+  Loader2,
 } from 'lucide-react';
 
-export default async function DashboardPage() {
-  const [{ profile }, transactionsResult, count] = await Promise.all([
-    getCurrentUser(),
-    getRecentTransactions(8),
+// Data fetching components
+async function DashboardStats() {
+  const [countResult, transactionsResult] = await Promise.all([
     getTransactionCount(),
+    getRecentTransactions(8),
   ]);
 
-  const transactions = transactionsResult.data || [];
+  const count = countResult || 0;
+  const transactions = transactionsResult?.data || [];
+  
+  const recentTotal = transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  return (
+    <div className="grid grid-cols-2 gap-4 animate-fade-in">
+      <div className="glass rounded-2xl p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-gold-500/10 flex items-center justify-center">
+            <Receipt className="w-5 h-5 text-gold-500" />
+          </div>
+        </div>
+        <p className="text-2xl font-bold text-surface-950">{count}</p>
+        <p className="text-sm text-surface-600">Total Transactions</p>
+      </div>
+      <div className="glass rounded-2xl p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-emerald-500" />
+          </div>
+        </div>
+        <p className="text-2xl font-bold text-surface-950">
+          {transactions.length > 0 ? formatCurrency(recentTotal) : '₱0.00'}
+        </p>
+        <p className="text-sm text-surface-600">Recent Total</p>
+      </div>
+    </div>
+  );
+}
+
+async function RecentTransactionsList() {
+  const result = await getRecentTransactions(8);
+  const transactions = result?.data || [];
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-surface-900">
+          Recent Transactions
+        </h2>
+        {transactions.length > 0 && (
+          <Link
+            href="/transactions"
+            className="text-sm text-gold-500 hover:text-gold-400 transition-colors flex items-center gap-1"
+          >
+            View all
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        )}
+      </div>
+
+      {transactions.length === 0 ? (
+        <div className="glass rounded-2xl p-8 text-center">
+          <Clock className="w-10 h-10 text-surface-500 mx-auto mb-3" />
+          <p className="text-surface-600 font-medium">No transactions yet</p>
+          <p className="text-sm text-surface-500 mt-1">
+            Create your first transaction to get started.
+          </p>
+          <Link
+            href="/transactions/new"
+            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl gold-gradient text-white text-sm font-medium hover:brightness-110 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            New Transaction
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {transactions.map((tx, index) => (
+            <Link
+              key={tx.id}
+              href={`/transactions/${tx.id}`}
+              className="glass rounded-xl p-4 flex items-center gap-4 hover:bg-surface-200/30 transition-all group animate-slide-up"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-surface-300/40 flex items-center justify-center shrink-0">
+                <User className="w-5 h-5 text-surface-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-surface-900 truncate">
+                  {(tx.customer as any)?.full_name || 'Unknown Customer'}
+                </p>
+                <p className="text-xs text-surface-500 mt-0.5">
+                  {getTransactionTypeLabel(tx.transaction_type)} ·{' '}
+                  {formatDateTime(tx.created_at)}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-semibold text-surface-900">
+                  {formatCurrency(tx.amount)}
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-surface-500/40 group-hover:text-surface-700 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Skeletons
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {[1, 2].map((i) => (
+        <div key={i} className="glass rounded-2xl p-5 animate-pulse">
+          <div className="w-10 h-10 rounded-xl bg-surface-300/50 mb-2"></div>
+          <div className="h-8 bg-surface-300/50 rounded w-1/2 mb-2"></div>
+          <div className="h-4 bg-surface-300/50 rounded w-1/3"></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TransactionsSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-6 bg-surface-300/50 rounded w-40 mb-4"></div>
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="glass rounded-xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-surface-300/50 shrink-0"></div>
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-surface-300/50 rounded w-1/3"></div>
+              <div className="h-3 bg-surface-300/50 rounded w-1/4"></div>
+            </div>
+            <div className="h-4 bg-surface-300/50 rounded w-16"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default async function DashboardPage() {
+  const { profile } = await getCurrentUser();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -81,98 +220,15 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="glass rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gold-500/10 flex items-center justify-center">
-              <Receipt className="w-5 h-5 text-gold-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-surface-950">{count}</p>
-          <p className="text-sm text-surface-600">Total Transactions</p>
-        </div>
-        <div className="glass rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-surface-950">
-            {transactions.length > 0
-              ? formatCurrency(
-                  transactions.reduce((sum, t) => sum + Number(t.amount || 0), 0)
-                )
-              : '₱0.00'}
-          </p>
-          <p className="text-sm text-surface-600">Recent Total</p>
-        </div>
-      </div>
+      {/* Suspended Dashboard Stats */}
+      <Suspense fallback={<StatsSkeleton />}>
+        <DashboardStats />
+      </Suspense>
 
-      {/* Recent Transactions */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-surface-900">
-            Recent Transactions
-          </h2>
-          {transactions.length > 0 && (
-            <Link
-              href="/transactions"
-              className="text-sm text-gold-500 hover:text-gold-400 transition-colors flex items-center gap-1"
-            >
-              View all
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
-        </div>
-
-        {transactions.length === 0 ? (
-          <div className="glass rounded-2xl p-8 text-center">
-            <Clock className="w-10 h-10 text-surface-500 mx-auto mb-3" />
-            <p className="text-surface-600 font-medium">No transactions yet</p>
-            <p className="text-sm text-surface-500 mt-1">
-              Create your first transaction to get started.
-            </p>
-            <Link
-              href="/transactions/new"
-              className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl gold-gradient text-white text-sm font-medium hover:brightness-110 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              New Transaction
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {transactions.map((tx, index) => (
-              <Link
-                key={tx.id}
-                href={`/transactions/${tx.id}`}
-                className="glass rounded-xl p-4 flex items-center gap-4 hover:bg-surface-200/30 transition-all group animate-slide-up"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="w-10 h-10 rounded-xl bg-surface-300/40 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 text-surface-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-surface-900 truncate">
-                    {(tx.customer as any)?.full_name || 'Unknown Customer'}
-                  </p>
-                  <p className="text-xs text-surface-500 mt-0.5">
-                    {getTransactionTypeLabel(tx.transaction_type)} ·{' '}
-                    {formatDateTime(tx.created_at)}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="font-semibold text-surface-900">
-                    {formatCurrency(tx.amount)}
-                  </p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-surface-500/40 group-hover:text-surface-700 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Suspended Recent Transactions */}
+      <Suspense fallback={<TransactionsSkeleton />}>
+        <RecentTransactionsList />
+      </Suspense>
     </div>
   );
 }
