@@ -36,11 +36,12 @@ export default function CustomersPage() {
     setSearched(true);
   }, []);
 
-  // Debounced search
+  // Real-time typeahead search on every keystroke
   useEffect(() => {
+    // 50ms debounce makes it instant on every keystroke without visual stutter
     const timer = setTimeout(() => {
       handleSearch(query);
-    }, 400);
+    }, 50);
     return () => clearTimeout(timer);
   }, [query, handleSearch]);
 
