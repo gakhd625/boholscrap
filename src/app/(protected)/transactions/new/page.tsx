@@ -63,7 +63,7 @@ function NewTransactionContent() {
         if (result.success && result.data) {
           setState((prev) => ({
             ...prev,
-            existingCustomer: result.data,
+            existingCustomer: result.data as Customer,
             step: 'review',
           }));
         }
